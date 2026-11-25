@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { download, outputSize, renderStill, runExport, webCodecsAvailable, type ExportFormat, type ExportOptions, type ExportProgress, type Resolution } from '../export/exporter';
+import { download, gifSize, outputSize, renderStill, runExport, webCodecsAvailable, type ExportFormat, type ExportOptions, type ExportProgress, type Resolution } from '../export/exporter';
 import { Button, Icon, Modal, Row, Segmented, Toggle } from './ui';
 import { canEncodeVideo } from 'mediabunny';
 
@@ -8,6 +8,7 @@ const FORMATS: { id: ExportFormat; title: string; desc: string }[] = [
   { id: 'mp4', title: 'MP4', desc: 'H.264 · universal playback, opaque' },
   { id: 'webm', title: 'WebM', desc: 'VP9 · supports alpha transparency' },
   { id: 'png', title: 'PNG Sequence', desc: 'Lossless frames · transparent · .zip' },
+  { id: 'gif', title: 'GIF', desc: 'Loops everywhere · chats, web, slides' },
 ];
 
 export function ExportDialog() {
@@ -16,6 +17,8 @@ export function ExportDialog() {
   const [format, setFormat] = useState<ExportFormat>(project.canvas.transparent ? 'webm' : 'mp4');
   const [resolution, setRes] = useState<Resolution>('1080');
   const [fps, setFps] = useState<25 | 30 | 60>(30);
+  const [gifFps, setGifFps] = useState(20);
+  const [gifLong, setGifLong] = useState(720);
   const [quality, setQuality] = useState<ExportOptions['quality']>('high');
   const [transparent, setTransparent] = useState(project.canvas.transparent);
   const [pngTarget, setPngTarget] = useState<'zip' | 'folder'>('zip');
@@ -24,8 +27,10 @@ export function ExportDialog() {
   const [error, setError] = useState<string | null>(null);
   const [alphaOk, setAlphaOk] = useState<boolean | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const size = outputSize(project, resolution);
-  const frames = Math.round(project.canvas.duration * fps);
+  const isGif = format === 'gif';
+  const size = isGif ? gifSize(project, gifLong) : outputSize(project, resolution);
+  const outFps = isGif ? gifFps : fps;
+  const frames = Math.round(project.canvas.duration * outFps);
   const folderSupported = 'showDirectoryPicker' in window;
   const busy = !!progress && !result && !error;
 
@@ -41,7 +46,7 @@ export function ExportDialog() {
     const t0 = performance.now();
     setProgress({ frame: 0, total: frames, phase: 'Preparing' });
     try {
-      const r = await runExport(project, { format, resolution, fps, quality, transparent, pngTarget }, setProgress, ac.signal);
+      const r = await runExport(project, { format, resolution, fps: outFps, quality, transparent, pngTarget, gifSize: gifLong }, setProgress, ac.signal);
       setResult({ ...r, ms: performance.now() - t0 });
       if (r.blob) download(r.blob, r.filename);
     } catch (e) {
@@ -57,7 +62,7 @@ export function ExportDialog() {
   };
 
   const pct = progress ? Math.round((progress.frame / Math.max(1, progress.total)) * 100) : 0;
-  const videoUnsupported = format !== 'png' && !webCodecsAvailable();
+  const videoUnsupported = (format === 'mp4' || format === 'webm') && !webCodecsAvailable();
 
   return (
     <Modal title="Export" onClose={() => { abortRef.current?.abort(); close(); }} width={600}
@@ -82,13 +87,26 @@ export function ExportDialog() {
           </button>
         ))}
       </div>
-      <Row label="Resolution">
-        <Segmented value={resolution} onChange={setRes} options={[{ value: '1080', label: '1080p' }, { value: '4k', label: '4K' }, { value: 'canvas', label: 'Canvas size' }]} />
-      </Row>
-      <Row label="Frame rate">
-        <Segmented value={String(fps) as '25' | '30' | '60'} onChange={(v) => setFps(+v as 25 | 30 | 60)} options={[{ value: '25', label: '25 fps' }, { value: '30', label: '30 fps' }, { value: '60', label: '60 fps' }]} />
-      </Row>
-      {format !== 'png' && (
+      {isGif ? (
+        <>
+          <Row label="Size (long edge)">
+            <Segmented value={String(gifLong)} onChange={(v) => setGifLong(+v)} options={[{ value: '480', label: '480 px' }, { value: '720', label: '720 px' }, { value: '1080', label: '1080 px' }]} />
+          </Row>
+          <Row label="Frame rate">
+            <Segmented value={String(gifFps)} onChange={(v) => setGifFps(+v)} options={[{ value: '12', label: '12 fps' }, { value: '15', label: '15 fps' }, { value: '20', label: '20 fps' }, { value: '25', label: '25 fps' }]} />
+          </Row>
+        </>
+      ) : (
+        <>
+          <Row label="Resolution">
+            <Segmented value={resolution} onChange={setRes} options={[{ value: '1080', label: '1080p' }, { value: '4k', label: '4K' }, { value: 'canvas', label: 'Canvas size' }]} />
+          </Row>
+          <Row label="Frame rate">
+            <Segmented value={String(fps) as '25' | '30' | '60'} onChange={(v) => setFps(+v as 25 | 30 | 60)} options={[{ value: '25', label: '25 fps' }, { value: '30', label: '30 fps' }, { value: '60', label: '60 fps' }]} />
+          </Row>
+        </>
+      )}
+      {format !== 'png' && !isGif && (
         <Row label="Quality">
           <Segmented value={quality} onChange={setQuality} options={[{ value: 'standard', label: 'Standard' }, { value: 'high', label: 'High' }, { value: 'max', label: 'Maximum' }]} />
         </Row>
@@ -101,6 +119,7 @@ export function ExportDialog() {
           <Segmented value={pngTarget} onChange={setPngTarget} options={[{ value: 'zip', label: 'ZIP archive' }, { value: 'folder', label: 'Folder on disk' }]} />
         </Row>
       )}
+      {isGif && <p className="hint">GIFs are limited to 256 colors per frame and get large quickly — 720 px at 15–20 fps is a good balance for chats and the web.{transparent ? ' Transparent GIFs have hard (non-smoothed) edges; use WebM or PNG for soft transparency.' : ''}</p>}
       {format === 'mp4' && project.canvas.transparent && <p className="hint warn">MP4 (H.264) can’t store transparency — the canvas background color will be used. Choose WebM or PNG for alpha.</p>}
       {format === 'webm' && transparent && alphaOk === false && <p className="hint warn">This browser can’t encode WebM with alpha. Use Chrome or Edge, or export a PNG sequence.</p>}
       {format === 'webm' && transparent && alphaOk && <p className="hint">VP9 with alpha plays with transparency in Chrome, Edge, Firefox, After Effects (with plugin), Premiere and DaVinci Resolve.</p>}

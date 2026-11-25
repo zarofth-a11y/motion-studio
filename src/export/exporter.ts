@@ -3,24 +3,32 @@ import {
   type VideoCodec,
 } from 'mediabunny';
 import { Zip, ZipPassThrough } from 'fflate';
+import { GIFEncoder, applyPalette, quantize } from 'gifenc';
 import type { Project } from '../types';
 import { renderProject } from '../render/renderer';
 import { ensureFonts } from '../lib/fonts';
 
-export type ExportFormat = 'mp4' | 'webm' | 'png';
+export type ExportFormat = 'mp4' | 'webm' | 'png' | 'gif';
 export type Resolution = 'canvas' | '1080' | '4k';
 
 export interface ExportOptions {
   format: ExportFormat;
   resolution: Resolution;
-  fps: 25 | 30 | 60;
+  fps: number;
   quality: 'standard' | 'high' | 'max';
   transparent: boolean; // webm/png only
   pngTarget?: 'zip' | 'folder';
   range?: [number, number];
+  gifSize?: number; // long edge in px
 }
 
 export interface ExportProgress { frame: number; total: number; phase: string }
+
+export function gifSize(project: Project, longEdge: number) {
+  const { width: w, height: h } = project.canvas;
+  const scale = Math.min(1, longEdge / Math.max(w, h));
+  return { width: even(w * scale), height: even(h * scale), scale };
+}
 
 export function outputSize(project: Project, res: Resolution) {
   const { width: w, height: h } = project.canvas;
@@ -46,7 +54,7 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 export async function runExport(
   project: Project, opts: ExportOptions, onProgress: (p: ExportProgress) => void, signal: AbortSignal,
 ): Promise<{ blob?: Blob; filename: string; savedToFolder?: boolean; codec?: string }> {
-  const { width, height, scale } = outputSize(project, opts.resolution);
+  const { width, height, scale } = opts.format === 'gif' ? gifSize(project, opts.gifSize ?? 720) : outputSize(project, opts.resolution);
   const [t0, t1] = opts.range ?? [0, project.canvas.duration];
   const total = Math.max(1, Math.round((t1 - t0) * opts.fps));
   const base = (project.name || 'motion-studio').replace(/[^\p{L}\p{N}\-_ ]/gu, '').trim().replace(/\s+/g, '-') || 'export';
@@ -57,9 +65,34 @@ export async function runExport(
 
   const canvas = document.createElement('canvas');
   canvas.width = width; canvas.height = height;
-  const ctx = canvas.getContext('2d', { alpha: true })!;
+  const ctx = canvas.getContext('2d', { alpha: true, willReadFrequently: opts.format === 'gif' })!;
   const alpha = opts.format !== 'mp4' && opts.transparent;
   const draw = (i: number) => renderProject(ctx, project, t0 + i / opts.fps, { scale, forceTransparent: alpha, forceOpaque: !alpha });
+
+  // ───────────── Animated GIF ─────────────
+  if (opts.format === 'gif') {
+    const gif = GIFEncoder();
+    // GIF timing is in 1/100 s: spread rounding across frames so total duration stays exact (e.g. 15 fps → 7,7,6…)
+    const delayAt = (i: number) => Math.max(2, Math.round(((i + 1) * 100) / opts.fps) - Math.round((i * 100) / opts.fps)) * 10;
+        for (let i = 0; i < total; i++) {
+      if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+      draw(i);
+      const { data } = ctx.getImageData(0, 0, width, height);
+      if (alpha) {
+        const palette = quantize(data, 256, { format: 'rgba4444', oneBitAlpha: true });
+        const index = applyPalette(data, palette, 'rgba4444');
+        const ti = palette.findIndex((c) => c[3] === 0);
+        gif.writeFrame(index, width, height, { palette, delay: delayAt(i), repeat: 0, transparent: ti >= 0, transparentIndex: Math.max(0, ti), dispose: 2 });
+      } else {
+        const palette = quantize(data, 256);
+        gif.writeFrame(applyPalette(data, palette), width, height, { palette, delay: delayAt(i), repeat: 0 });
+      }
+      onProgress({ frame: i + 1, total, phase: 'Encoding GIF' });
+      if (i % 2 === 0) await tick();
+    }
+    gif.finish();
+    return { blob: new Blob([gif.bytes() as BlobPart], { type: 'image/gif' }), filename: `${base}_${width}x${height}${alpha ? '_alpha' : ''}.gif` };
+  }
 
   // ───────────── PNG sequence ─────────────
   if (opts.format === 'png') {

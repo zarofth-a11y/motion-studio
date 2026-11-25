@@ -377,7 +377,7 @@ textarea.text-input { height: auto; padding: 7px 9px; resize: vertical; line-hei
 .modal-foot { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-top: 1px solid var(--line); }
 @keyframes fade { from { opacity: 0; } }
 @keyframes pop { from { opacity: 0; transform: scale(.96) translateY(8px); } }
-.fmt-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
+.fmt-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 4px; }
 .fmt-card { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; transition: all .12s; }
 .fmt-card:hover { border-color: var(--line-2); }
 .fmt-card.on { border-color: var(--accent); background: rgba(10,132,255,.08); box-shadow: 0 0 0 3px rgba(10,132,255,.15); }
