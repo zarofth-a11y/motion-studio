@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { resolveColor } from '../lib/color';
 import { useStore } from '../store';
+import { useT } from '../i18n';
 
 // ───────────────── Icons ─────────────────
 const P: Record<string, ReactNode> = {
@@ -97,6 +98,7 @@ export function Grid2({ children }: { children: ReactNode }) {
 export function NumberField({ label, value, onChange, step = 1, min, max, suffix, precision }: {
   label?: string; value: number; onChange: (v: number) => void; step?: number; min?: number; max?: number; suffix?: string; precision?: number;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<string | null>(null);
   const clampV = (v: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, v));
   const prec = precision ?? (step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0);
@@ -117,7 +119,7 @@ export function NumberField({ label, value, onChange, step = 1, min, max, suffix
   };
   return (
     <div className="numfield">
-      {label && <span className="scrub" onPointerDown={startScrub} title="Drag to adjust · Shift ×10 · Alt ×0.1">{label}</span>}
+      {label && <span className="scrub" onPointerDown={startScrub} title={t('Drag to adjust · Shift ×10 · Alt ×0.1')}>{label}</span>}
       <input
         type="text" inputMode="decimal" value={display}
         onFocus={(e) => { setDraft(display); e.target.select(); }}
@@ -197,6 +199,7 @@ export function Segmented<T extends string>({ value, onChange, options }: { valu
 /** Color field: brand palette references ($0…) or any custom color */
 export function ColorField({ value, onChange, allowPalette = true }: { value: string; onChange: (v: string) => void; allowPalette?: boolean }) {
   const palette = useStore((s) => s.project.palette.colors);
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const resolved = resolveColor(value, palette, '#000000');
@@ -211,22 +214,22 @@ export function ColorField({ value, onChange, allowPalette = true }: { value: st
     <div className="colorfield" ref={ref}>
       <button type="button" className="swatch-btn" onClick={(e) => { e.preventDefault(); setOpen(!open); }}>
         <span className="swatch" style={{ background: resolved }} />
-        <span className="color-text">{isRef ? `Brand ${parseInt(value.slice(1)) + 1}` : value}</span>
-        {isRef && <span className="badge">LINKED</span>}
+        <span className="color-text">{isRef ? t('Brand {n}', { n: parseInt(value.slice(1)) + 1 }) : value}</span>
+        {isRef && <span className="badge">{t('LINKED')}</span>}
       </button>
       {open && (
         <div className="color-pop">
           {allowPalette && (
             <>
-              <div className="pop-label">Brand palette <span className="muted">— linked, updates with palette</span></div>
+              <div className="pop-label">{t('Brand palette')} <span className="muted">{t('— linked, updates with palette')}</span></div>
               <div className="pop-swatches">
                 {palette.map((c, i) => (
-                  <button key={i} type="button" className={`pop-sw ${value === '$' + i ? 'sel' : ''}`} style={{ background: c }} title={`Brand ${i + 1}`} onClick={() => { onChange('$' + i); setOpen(false); }} />
+                  <button key={i} type="button" className={`pop-sw ${value === '$' + i ? 'sel' : ''}`} style={{ background: c }} title={t('Brand {n}', { n: i + 1 })} onClick={() => { onChange('$' + i); setOpen(false); }} />
                 ))}
               </div>
             </>
           )}
-          <div className="pop-label">Custom</div>
+          <div className="pop-label">{t('Custom')}</div>
           <div className="pop-custom">
             <input type="color" value={/^#[0-9a-f]{6}$/i.test(resolved) ? resolved : '#ffffff'} onChange={(e) => onChange(e.target.value)} />
             <input className="text-input mono" value={isRef ? resolved : value} onChange={(e) => onChange(e.target.value)} />
@@ -254,6 +257,7 @@ export function Button({ children, onClick, variant = 'default', icon, disabled,
 }
 
 export function Modal({ title, onClose, children, width = 560, footer }: { title: string; onClose: () => void; children: ReactNode; width?: number; footer?: ReactNode }) {
+  const t = useT();
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', h);
@@ -264,7 +268,7 @@ export function Modal({ title, onClose, children, width = 560, footer }: { title
       <div className="modal" style={{ width }}>
         <div className="modal-head">
           <h2>{title}</h2>
-          <IconButton icon="x" title="Close" onClick={onClose} />
+          <IconButton icon="x" title={t('Close')} onClick={onClose} />
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}

@@ -4,6 +4,7 @@ import type { BaseElement } from '../types';
 import { FIELDS, HAS_TABLE, MULTI_SERIES } from './fields';
 import { ColorField, Icon, IconButton, Button } from './ui';
 import { FieldControl } from './FieldControl';
+import { useT } from '../i18n';
 
 /** Parse CSV / TSV (e.g. pasted from Excel / Google Sheets) */
 export function parseTable(text: string) {
@@ -25,6 +26,7 @@ export function parseTable(text: string) {
 
 export function DataEditor({ el }: { el: BaseElement }) {
   const st = useStore.getState;
+  const t = useT();
   const [paste, setPaste] = useState<string | null>(null);
   const up = (fn: (e: BaseElement) => void, key?: string) => st().updateElement(el.id, fn, key);
   const fields = FIELDS[el.type].filter((f) => f.data);
@@ -40,13 +42,13 @@ export function DataEditor({ el }: { el: BaseElement }) {
             <table className="dtable">
               <thead>
                 <tr>
-                  <th className="lbl">{el.type === 'kpi' ? 'Point' : 'Label'}</th>
+                  <th className="lbl">{el.type === 'kpi' ? t('Point') : t('Label')}</th>
                   {series.map((s, si) => (
                     <th key={si}>
                       <div className="series-head">
                         {multi && <ColorField value={s.color} onChange={(c) => up((e) => { e.data.series[si].color = c; }, 'scol')} />}
                         <input dir="auto" value={s.name} onChange={(ev) => up((e) => { e.data.series[si].name = ev.target.value; }, 'sname' + si)} />
-                        {multi && series.length > 1 && <IconButton size={12} icon="x" title="Remove series" onClick={() => up((e) => { e.data.series.splice(si, 1); })} />}
+                        {multi && series.length > 1 && <IconButton size={12} icon="x" title={t('Remove series')} onClick={() => up((e) => { e.data.series.splice(si, 1); })} />}
                       </div>
                     </th>
                   ))}
@@ -77,7 +79,7 @@ export function DataEditor({ el }: { el: BaseElement }) {
                       </td>
                     ))}
                     <td className="act">
-                      <IconButton size={12} icon="x" title="Remove row" onClick={() => up((e) => { e.data.labels.splice(i, 1); e.data.series.forEach((s) => s.values.splice(i, 1)); })} />
+                      <IconButton size={12} icon="x" title={t('Remove row')} onClick={() => up((e) => { e.data.labels.splice(i, 1); e.data.series.forEach((s) => s.values.splice(i, 1)); })} />
                     </td>
                   </tr>
                 ))}
@@ -86,30 +88,30 @@ export function DataEditor({ el }: { el: BaseElement }) {
           </div>
           <div className="table-actions">
             <Button variant="ghost" icon="plus" onClick={() => up((e) => {
-              e.data.labels.push(`Item ${e.data.labels.length + 1}`);
+              e.data.labels.push(t('Item {n}', { n: e.data.labels.length + 1 }));
               e.data.series.forEach((s) => s.values.push(s.values[s.values.length - 1] ?? 10));
-            })}>Row</Button>
+            })}>{t('Row')}</Button>
             {multi && <Button variant="ghost" icon="plus" onClick={() => up((e) => {
-              e.data.series.push({ name: `Series ${e.data.series.length + 1}`, color: '$' + e.data.series.length, values: e.data.labels.map((_, i) => Math.round((e.data.series[0]?.values[i] ?? 10) * 0.7)) });
-            })}>Series</Button>}
-            <Button variant="ghost" icon="file" onClick={() => setPaste(paste === null ? '' : null)}>Paste CSV</Button>
+              e.data.series.push({ name: t('Series {n}', { n: e.data.series.length + 1 }), color: '$' + e.data.series.length, values: e.data.labels.map((_, i) => Math.round((e.data.series[0]?.values[i] ?? 10) * 0.7)) });
+            })}>{t('Series')}</Button>}
+            <Button variant="ghost" icon="file" onClick={() => setPaste(paste === null ? '' : null)}>{t('Paste CSV')}</Button>
           </div>
           {paste !== null && (
             <div className="paste-box">
-              <textarea dir="auto" autoFocus placeholder={'Paste from Excel / Sheets or CSV:\nMonth, 2025, 2026\nJan, 12, 18\nFeb, 19, 24'} value={paste} onChange={(e) => setPaste(e.target.value)} rows={6} />
+              <textarea dir="auto" autoFocus placeholder={t('Paste from Excel / Sheets or CSV:') + '\nMonth, 2025, 2026\nJan, 12, 18\nFeb, 19, 24'} value={paste} onChange={(e) => setPaste(e.target.value)} rows={6} />
               <div className="table-actions">
                 <Button variant="primary" onClick={() => {
-                  const t = parseTable(paste);
-                  if (!t || !t.labels.length) { st().notify('Could not read that data'); return; }
+                  const tb = parseTable(paste);
+                  if (!tb || !tb.labels.length) { st().notify(t('Could not read that data')); return; }
                   up((e) => {
-                    e.data.labels = t.labels;
-                    const keep = multi ? t.series : t.series.slice(0, 1);
+                    e.data.labels = tb.labels;
+                    const keep = multi ? tb.series : tb.series.slice(0, 1);
                     e.data.series = keep.map((s, i) => ({ name: s.name, color: e.data.series[i]?.color ?? '$' + i, values: s.values }));
                   });
                   setPaste(null);
-                  st().notify(`Imported ${t.labels.length} rows`);
-                }}>Apply data</Button>
-                <Button variant="ghost" onClick={() => setPaste(null)}>Cancel</Button>
+                  st().notify(t('Imported {n} rows', { n: tb.labels.length }));
+                }}>{t('Apply data')}</Button>
+                <Button variant="ghost" onClick={() => setPaste(null)}>{t('Cancel')}</Button>
               </div>
             </div>
           )}
@@ -123,11 +125,12 @@ export function DataEditor({ el }: { el: BaseElement }) {
 export function DataSheet() {
   const elements = useStore((s) => s.project.elements);
   const st = useStore.getState;
+  const t = useT();
   const withData = elements.filter((e) => FIELDS[e.type].some((f) => f.data) || HAS_TABLE[e.type]);
   return (
     <div className="data-sheet">
       <p className="hint">
-        <Icon name="sparkle" size={13} /> Edit the numbers of every element here. Animations, styles and timing stay exactly as designed — perfect for reusing a branded template with new data.
+        <Icon name="sparkle" size={13} /> {t('Edit the numbers of every element here. Animations, styles and timing stay exactly as designed — perfect for reusing a branded template with new data.')}
       </p>
       {withData.map((el) => (
         <div key={el.id} className="sheet-item">
@@ -137,7 +140,7 @@ export function DataSheet() {
           <DataEditor el={el} />
         </div>
       ))}
-      {!withData.length && <div className="empty-hint">No data-driven elements yet.</div>}
+      {!withData.length && <div className="empty-hint">{t('No data-driven elements yet.')}</div>}
     </div>
   );
 }

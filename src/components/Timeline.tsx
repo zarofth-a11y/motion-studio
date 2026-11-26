@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { Icon, IconButton, NumberField, Select } from './ui';
 import type { BaseElement } from '../types';
 import { resolveColor } from '../lib/color';
+import { useT } from '../i18n';
 
 const TRACK_H = 30;
 
@@ -25,6 +26,7 @@ export function Timeline() {
   const playing = useStore((s) => s.playing);
   const loop = useStore((s) => s.loop);
   const selectedId = useStore((s) => s.selectedId);
+  const t = useT();
   const [fps, setFps] = useState(30);
   const [pxPerSec, setPx] = useState(140);
   const areaRef = useRef<HTMLDivElement>(null);
@@ -81,28 +83,28 @@ export function Timeline() {
     <div className="timeline">
       <div className="tl-bar">
         <div className="transport">
-          <IconButton icon="start" title="Go to start (Home)" onClick={() => { st().setTime(0); }} />
-          <IconButton icon="prev" title="Previous frame (,)" onClick={() => st().setTime(time - frame)} />
-          <button className="play-btn" onClick={() => st().togglePlay()} title="Play / Pause (Space)">
+          <IconButton icon="start" title={t('Go to start (Home)')} onClick={() => { st().setTime(0); }} />
+          <IconButton icon="prev" title={t('Previous frame (,)')} onClick={() => st().setTime(time - frame)} />
+          <button className="play-btn" onClick={() => st().togglePlay()} title={t('Play / Pause (Space)')}>
             <Icon name={playing ? 'pause' : 'play'} size={16} />
           </button>
-          <IconButton icon="next" title="Next frame (.)" onClick={() => st().setTime(time + frame)} />
-          <IconButton icon="end" title="Go to end (End)" onClick={() => st().setTime(D)} />
-          <IconButton icon="loop" title="Loop playback" active={loop} onClick={() => st().setLoop(!loop)} />
+          <IconButton icon="next" title={t('Next frame (.)')} onClick={() => st().setTime(time + frame)} />
+          <IconButton icon="end" title={t('Go to end (End)')} onClick={() => st().setTime(D)} />
+          <IconButton icon="loop" title={t('Loop playback')} active={loop} onClick={() => st().setLoop(!loop)} />
         </div>
-        <div className="timecode">
+        <div className="timecode" dir="ltr">
           <span className="tc-main">{fmtTime(time, fps)}</span>
           <span className="tc-sub">/ {fmtTime(D, fps)} · F{Math.round(time * fps)}</span>
         </div>
         <div className="tl-right">
-          <span className="muted small">Preview FPS</span>
+          <span className="muted small">{t('Preview FPS')}</span>
           <Select value={fps} onChange={setFps} options={[{ value: 25, label: '25' }, { value: 30, label: '30' }, { value: 60, label: '60' }]} />
-          <span className="muted small">Duration</span>
+          <span className="muted small">{t('Duration')}</span>
           <div style={{ width: 74 }}>
-            <NumberField value={D} step={0.1} min={0.5} max={120} suffix="s" onChange={(v) => st().update((p) => { p.canvas.duration = v; }, 'duration')} />
+            <NumberField value={D} step={0.1} min={0.5} max={120} suffix={t('s')} onChange={(v) => st().update((p) => { p.canvas.duration = v; }, 'duration')} />
           </div>
-          <button className="btn btn-ghost small" onClick={() => st().fitDuration()} title="Set duration to fit all animations + 1s hold">Fit</button>
-          <input className="tl-zoom" type="range" min={40} max={400} value={pxPerSec} onChange={(e) => setPx(+e.target.value)} title="Timeline zoom" />
+          <button className="btn btn-ghost small" onClick={() => st().fitDuration()} title={t('Set duration to fit all animations + 1s hold')}>{t('Fit')}</button>
+          <input className="tl-zoom" type="range" min={40} max={400} value={pxPerSec} onChange={(e) => setPx(+e.target.value)} title={t('Timeline zoom')} />
         </div>
       </div>
       <div className="tl-main">
@@ -115,12 +117,12 @@ export function Timeline() {
             </div>
           ))}
         </div>
-        <div className="tl-area" ref={areaRef}>
+        <div className="tl-area" ref={areaRef} dir="ltr">
           <div style={{ width: width + 40, position: 'relative' }}>
             <div className="tl-ruler" onPointerDown={scrub}>
-              {ticks.map((t) => (
-                <div key={t} className={`tick ${Number.isInteger(t) ? 'major' : ''}`} style={{ left: t * pxPerSec }}>
-                  {Number.isInteger(t) && <span>{t}s</span>}
+              {ticks.map((tk) => (
+                <div key={tk} className={`tick ${Number.isInteger(tk) ? 'major' : ''}`} style={{ left: tk * pxPerSec }}>
+                  {Number.isInteger(tk) && <span>{tk}s</span>}
                 </div>
               ))}
             </div>
@@ -150,7 +152,7 @@ export function Timeline() {
                   </div>
                 );
               })}
-              {project.elements.length === 0 && <div className="tl-empty">Add an element from the library to start animating</div>}
+              {project.elements.length === 0 && <div className="tl-empty">{t('Add an element from the library to start animating')}</div>}
             </div>
             <div className="tl-end" style={{ left: D * pxPerSec }} />
             <div className="playhead" style={{ left: time * pxPerSec }}><span /></div>

@@ -3,9 +3,11 @@ import { useStore } from '../store';
 import { builtinTemplates } from '../defaults';
 import { download, renderThumbnail } from '../export/exporter';
 import { Button, Icon, IconButton, Modal, Row, TextField, Toggle } from './ui';
+import { useT } from '../i18n';
 import type { Template } from '../types';
 
 export function TemplatesDialog() {
+  const t = useT();
   const user = useStore((s) => s.templates);
   const st = useStore.getState;
   const builtins = useMemo(() => builtinTemplates().map((t) => ({ ...t, thumbnail: renderThumbnail(t.project) })), []);
@@ -15,24 +17,24 @@ export function TemplatesDialog() {
 
   const apply = (t: Template) => { st().applyTemplate(t, keepData); close(); };
 
-  const card = (t: Template, deletable: boolean) => (
-    <div key={t.id} className="tpl-card" onClick={() => apply(t)}>
+  const card = (tp: Template, deletable: boolean) => (
+    <div key={tp.id} className="tpl-card" onClick={() => apply(tp)}>
       <div className="tpl-thumb">
-        {t.thumbnail ? <img src={t.thumbnail} alt="" /> : <Icon name="grid" size={28} />}
-        <span className="tpl-meta">{t.project.canvas.width}×{t.project.canvas.height} · {t.project.canvas.direction.toUpperCase()}</span>
+        {tp.thumbnail ? <img src={tp.thumbnail} alt="" /> : <Icon name="grid" size={28} />}
+        <span className="tpl-meta">{tp.project.canvas.width}×{tp.project.canvas.height} · {tp.project.canvas.direction.toUpperCase()}</span>
       </div>
       <div className="tpl-foot">
-        <span dir="auto">{t.name}</span>
+        <span dir="auto">{tp.builtIn ? t(tp.name) : tp.name}</span>
         <div onClick={(e) => e.stopPropagation()} className="tpl-actions">
-          <IconButton size={13} icon="download" title="Export template file" onClick={() => download(new Blob([JSON.stringify({ motionStudio: 1, templates: [t] }, null, 2)], { type: 'application/json' }), `${t.name}.motion.json`)} />
-          {deletable && <IconButton size={13} icon="trash" title="Delete template" onClick={() => st().deleteTemplate(t.id)} />}
+          <IconButton size={13} icon="download" title={t('Export template file')} onClick={() => download(new Blob([JSON.stringify({ motionStudio: 1, templates: [tp] }, null, 2)], { type: 'application/json' }), `${tp.name}.motion.json`)} />
+          {deletable && <IconButton size={13} icon="trash" title={t('Delete template')} onClick={() => st().deleteTemplate(tp.id)} />}
         </div>
       </div>
     </div>
   );
 
   return (
-    <Modal title="Templates" onClose={close} width={880}
+    <Modal title={t('Templates')} onClose={close} width={880}
       footer={
         <>
           <input ref={fileRef} type="file" accept=".json" hidden onChange={async (e) => {
@@ -44,40 +46,41 @@ export function TemplatesDialog() {
               if (!list.length) throw new Error();
               list.forEach((t) => { if (!t.thumbnail) t.thumbnail = renderThumbnail(t.project); });
               st().importTemplates(list);
-            } catch { st().notify('Not a valid Motion Studio template file'); }
+            } catch { st().notify(t('Not a valid Motion Studio template file')); }
             e.target.value = '';
           }} />
-          <Button variant="ghost" icon="upload" onClick={() => fileRef.current?.click()}>Import .json</Button>
-          {user.length > 0 && <Button variant="ghost" icon="download" onClick={() => download(new Blob([JSON.stringify({ motionStudio: 1, templates: user }, null, 2)], { type: 'application/json' }), 'motion-studio-templates.json')}>Export all</Button>}
+          <Button variant="ghost" icon="upload" onClick={() => fileRef.current?.click()}>{t('Import .json')}</Button>
+          {user.length > 0 && <Button variant="ghost" icon="download" onClick={() => download(new Blob([JSON.stringify({ motionStudio: 1, templates: user }, null, 2)], { type: 'application/json' }), 'motion-studio-templates.json')}>{t('Export all')}</Button>}
           <div style={{ flex: 1 }} />
           <label className="keep-data">
             <Toggle value={keepData} onChange={setKeepData} />
-            <span>Keep my current data <em className="muted">— apply design only</em></span>
+            <span>{t('Keep my current data')} <em className="muted">{t('— apply design only')}</em></span>
           </label>
         </>
       }>
-      <div className="tpl-section-title">My templates</div>
+      <div className="tpl-section-title">{t('My templates')}</div>
       {user.length ? <div className="tpl-grid">{user.map((t) => card(t, true))}</div> : (
-        <div className="empty-hint left">No saved templates yet. Use <b>Save as template</b> in the top bar to store your branded design for reuse.</div>
+        <div className="empty-hint left">{t('No saved templates yet. Use “Save as template” in the top bar to store your branded design for reuse.')}</div>
       )}
-      <div className="tpl-section-title">Starter templates</div>
+      <div className="tpl-section-title">{t('Starter templates')}</div>
       <div className="tpl-grid">{builtins.map((t) => card(t, false))}</div>
     </Modal>
   );
 }
 
 export function SaveTemplateDialog() {
+  const t = useT();
   const project = useStore((s) => s.project);
   const st = useStore.getState;
-  const [name, setName] = useState(project.name || 'My template');
+  const [name, setName] = useState(project.name || t('My template'));
   const thumb = useMemo(() => renderThumbnail(project, 520), [project]);
-  const save = () => { st().saveTemplate(name.trim() || 'Untitled template', renderThumbnail(project)); st().setModal(null); };
+  const save = () => { st().saveTemplate(name.trim() || t('Untitled template'), renderThumbnail(project)); st().setModal(null); };
   return (
-    <Modal title="Save as template" onClose={() => st().setModal(null)} width={480}
-      footer={<><div style={{ flex: 1 }} /><Button variant="ghost" onClick={() => st().setModal(null)}>Cancel</Button><Button variant="primary" icon="save" onClick={save}>Save template</Button></>}>
+    <Modal title={t('Save as template')} onClose={() => st().setModal(null)} width={480}
+      footer={<><div style={{ flex: 1 }} /><Button variant="ghost" onClick={() => st().setModal(null)}>{t('Cancel')}</Button><Button variant="primary" icon="save" onClick={save}>{t('Save template')}</Button></>}>
       <img className="save-thumb" src={thumb} alt="" />
-      <Row label="Template name"><TextField value={name} onChange={setName} /></Row>
-      <p className="hint">Saves layout, brand palette, fonts, styles, animation timing and current data. Later, load it and only change the numbers in the <b>Data</b> tab — the animation rebuilds itself.</p>
+      <Row label={t('Template name')}><TextField value={name} onChange={setName} /></Row>
+      <p className="hint">{t('Saves layout, brand palette, fonts, styles, animation timing and current data. Later, load it and only change the numbers in the Data tab — the animation rebuilds itself.')}</p>
     </Modal>
   );
 }

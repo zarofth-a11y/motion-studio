@@ -27,6 +27,7 @@ Video export needs **WebCodecs**. Chrome and Edge support all formats, including
 | **Preview & timeline** | Real-time preview. Drag/resize with snapping to the canvas and other elements, title-safe guides, zoom. Timeline with scrubbing, frame stepping, loop, and clips you can drag or trim to change delay and duration |
 | **Templates** | Save branded templates with thumbnails, then apply one with your own data, or apply only its design and keep your current data. Templates import/export as `.json`, and four starter templates are included (one is Arabic RTL) |
 | **Export** | MP4 (H.264), WebM (VP9 with **alpha**), PNG sequence (RGBA; saved as a ZIP or written straight to a folder in Chromium), and looping animated GIF (480/720/1080 px, 12–25 fps, optional 1-bit transparency). 1080p / 4K / canvas size, 25/30/60 fps, three quality levels, and a single-frame PNG |
+| **Interface language** | Full English and Arabic interface with a toggle in the top bar. The Arabic interface mirrors the whole layout right-to-left; the choice is remembered per browser |
 | **Workflow** | Undo/redo, autosave to localStorage, project files, keyboard shortcuts (Space, ⌘Z, ⌘D, ⌫, arrows, `,` `.`, Home/End, ⌘E export) |
 
 ## Architecture

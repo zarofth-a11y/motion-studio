@@ -3,6 +3,8 @@ import type { BaseElement, ElementType, Palette, Project, Template } from './typ
 import { BUILTIN_PALETTES, builtinTemplates, createElement, createProject } from './defaults';
 import { uid } from './lib/color';
 import { contentEnd } from './render/renderer';
+import { tr } from './i18n';
+import { ELEMENT_META } from './defaults';
 
 const LS_PROJECT = 'motionstudio.project.v1';
 const LS_TEMPLATES = 'motionstudio.templates.v1';
@@ -126,7 +128,7 @@ export const useStore = create<State>((set, get) => ({
     el.anim.delay = Math.min(get().time, Math.max(0, project.canvas.duration - el.anim.duration));
     if (project.canvas.direction === 'rtl') el.format.digits = 'arabic';
     const n = project.elements.filter((e) => e.type === type).length;
-    if (n) el.name += ' ' + (n + 1);
+    el.name = tr(ELEMENT_META[type].label) + (n ? ' ' + (n + 1) : '');
     get().update((p) => { p.elements.push(el); });
     set({ selectedId: el.id, panel: 'element' });
   },
@@ -138,7 +140,7 @@ export const useStore = create<State>((set, get) => ({
     const src = get().project.elements.find((e) => e.id === id);
     if (!src) return;
     const el = clone(src);
-    el.id = uid('el'); el.name = src.name + ' copy'; el.x += 30; el.y += 30;
+    el.id = uid('el'); el.name = src.name + tr(' copy'); el.x += 30; el.y += 30;
     get().update((p) => { p.elements.splice(p.elements.findIndex((e) => e.id === id) + 1, 0, el); });
     set({ selectedId: el.id });
   },
@@ -186,7 +188,7 @@ export const useStore = create<State>((set, get) => ({
     const templates = [t, ...get().templates];
     set({ templates });
     save(LS_TEMPLATES, templates);
-    get().notify(`Template “${name}” saved`);
+    get().notify(tr('Template “{name}” saved', { name }));
   },
   applyTemplate: (t, keepData = false) => {
     const cur = get().project;
@@ -205,7 +207,7 @@ export const useStore = create<State>((set, get) => ({
       }
     }
     get().loadProject(next);
-    get().notify(keepData ? 'Template applied — your data was kept' : `Loaded “${t.name}”`);
+    get().notify(keepData ? tr('Template applied — your data was kept') : tr('Loaded “{name}”', { name: t.name }));
   },
   deleteTemplate: (id) => {
     const templates = get().templates.filter((t) => t.id !== id);
@@ -216,7 +218,7 @@ export const useStore = create<State>((set, get) => ({
     const templates = [...list.map((t) => ({ ...t, id: uid('tpl'), builtIn: false })), ...get().templates];
     set({ templates });
     save(LS_TEMPLATES, templates);
-    get().notify(`Imported ${list.length} template${list.length > 1 ? 's' : ''}`);
+    get().notify(tr('Imported {n} template(s)', { n: list.length }));
   },
   savePalette: (name) => {
     const pal: Palette = { id: uid('pal'), name, colors: [...get().project.palette.colors] };
@@ -224,7 +226,7 @@ export const useStore = create<State>((set, get) => ({
     set({ palettes });
     save(LS_PALETTES, palettes);
     get().update((p) => { p.palette = { ...pal, colors: [...pal.colors] }; });
-    get().notify(`Palette “${name}” saved`);
+    get().notify(tr('Palette “{name}” saved', { name }));
   },
   applyPalette: (pal) => get().update((p) => { p.palette = { ...pal, colors: [...pal.colors] }; }),
   deletePalette: (id) => {

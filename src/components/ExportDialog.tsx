@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { download, gifSize, outputSize, renderStill, runExport, webCodecsAvailable, type ExportFormat, type ExportOptions, type ExportProgress, type Resolution } from '../export/exporter';
 import { Button, Icon, Modal, Row, Segmented, Toggle } from './ui';
+import { useT } from '../i18n';
 import { canEncodeVideo } from 'mediabunny';
 
 const FORMATS: { id: ExportFormat; title: string; desc: string }[] = [
@@ -12,6 +13,7 @@ const FORMATS: { id: ExportFormat; title: string; desc: string }[] = [
 ];
 
 export function ExportDialog() {
+  const t = useT();
   const project = useStore((s) => s.project);
   const close = () => useStore.getState().setModal(null);
   const [format, setFormat] = useState<ExportFormat>(project.canvas.transparent ? 'webm' : 'mp4');
@@ -65,16 +67,16 @@ export function ExportDialog() {
   const videoUnsupported = (format === 'mp4' || format === 'webm') && !webCodecsAvailable();
 
   return (
-    <Modal title="Export" onClose={() => { abortRef.current?.abort(); close(); }} width={600}
+    <Modal title={t('Export')} onClose={() => { abortRef.current?.abort(); close(); }} width={600}
       footer={
         <>
-          <Button variant="ghost" icon="camera" onClick={still} disabled={busy}>Current frame PNG</Button>
+          <Button variant="ghost" icon="camera" onClick={still} disabled={busy}>{t('Current frame PNG')}</Button>
           <div style={{ flex: 1 }} />
           {busy ? (
-            <Button variant="danger" onClick={() => abortRef.current?.abort()}>Cancel</Button>
+            <Button variant="danger" onClick={() => abortRef.current?.abort()}>{t('Cancel')}</Button>
           ) : (
             <Button variant="primary" icon="export" onClick={start} disabled={videoUnsupported || (format === 'webm' && transparent && alphaOk === false)}>
-              {result ? 'Export again' : `Export ${format === 'png' ? 'PNGs' : format.toUpperCase()}`}
+              {result ? t('Export again') : t('Export {f}', { f: format === 'png' ? 'PNG' : format.toUpperCase() })}
             </Button>
           )}
         </>
@@ -82,74 +84,74 @@ export function ExportDialog() {
       <div className="fmt-cards">
         {FORMATS.map((f) => (
           <button key={f.id} className={`fmt-card ${format === f.id ? 'on' : ''}`} disabled={busy} onClick={() => { setFormat(f.id); if (f.id !== 'mp4') setTransparent(project.canvas.transparent || transparent); }}>
-            <span className="fmt-title">{f.title}</span>
-            <span className="fmt-desc">{f.desc}</span>
+            <span className="fmt-title">{t(f.title)}</span>
+            <span className="fmt-desc">{t(f.desc)}</span>
           </button>
         ))}
       </div>
       {isGif ? (
         <>
-          <Row label="Size (long edge)">
+          <Row label={t('Size (long edge)')}>
             <Segmented value={String(gifLong)} onChange={(v) => setGifLong(+v)} options={[{ value: '480', label: '480 px' }, { value: '720', label: '720 px' }, { value: '1080', label: '1080 px' }]} />
           </Row>
-          <Row label="Frame rate">
+          <Row label={t('Frame rate')}>
             <Segmented value={String(gifFps)} onChange={(v) => setGifFps(+v)} options={[{ value: '12', label: '12 fps' }, { value: '15', label: '15 fps' }, { value: '20', label: '20 fps' }, { value: '25', label: '25 fps' }]} />
           </Row>
         </>
       ) : (
         <>
-          <Row label="Resolution">
-            <Segmented value={resolution} onChange={setRes} options={[{ value: '1080', label: '1080p' }, { value: '4k', label: '4K' }, { value: 'canvas', label: 'Canvas size' }]} />
+          <Row label={t('Resolution')}>
+            <Segmented value={resolution} onChange={setRes} options={[{ value: '1080', label: '1080p' }, { value: '4k', label: '4K' }, { value: 'canvas', label: t('Canvas size') }]} />
           </Row>
-          <Row label="Frame rate">
+          <Row label={t('Frame rate')}>
             <Segmented value={String(fps) as '25' | '30' | '60'} onChange={(v) => setFps(+v as 25 | 30 | 60)} options={[{ value: '25', label: '25 fps' }, { value: '30', label: '30 fps' }, { value: '60', label: '60 fps' }]} />
           </Row>
         </>
       )}
       {format !== 'png' && !isGif && (
-        <Row label="Quality">
-          <Segmented value={quality} onChange={setQuality} options={[{ value: 'standard', label: 'Standard' }, { value: 'high', label: 'High' }, { value: 'max', label: 'Maximum' }]} />
+        <Row label={t('Quality')}>
+          <Segmented value={quality} onChange={setQuality} options={[{ value: 'standard', label: t('Standard') }, { value: 'high', label: t('High') }, { value: 'max', label: t('Maximum') }]} />
         </Row>
       )}
       {format !== 'mp4' && (
-        <Row label="Transparent background"><Toggle value={transparent} onChange={setTransparent} /></Row>
+        <Row label={t('Transparent background')}><Toggle value={transparent} onChange={setTransparent} /></Row>
       )}
       {format === 'png' && folderSupported && (
-        <Row label="Save as">
-          <Segmented value={pngTarget} onChange={setPngTarget} options={[{ value: 'zip', label: 'ZIP archive' }, { value: 'folder', label: 'Folder on disk' }]} />
+        <Row label={t('Save as')}>
+          <Segmented value={pngTarget} onChange={setPngTarget} options={[{ value: 'zip', label: t('ZIP archive') }, { value: 'folder', label: t('Folder on disk') }]} />
         </Row>
       )}
-      {isGif && <p className="hint">GIFs are limited to 256 colors per frame and get large quickly — 720 px at 15–20 fps is a good balance for chats and the web.{transparent ? ' Transparent GIFs have hard (non-smoothed) edges; use WebM or PNG for soft transparency.' : ''}</p>}
-      {format === 'mp4' && project.canvas.transparent && <p className="hint warn">MP4 (H.264) can’t store transparency — the canvas background color will be used. Choose WebM or PNG for alpha.</p>}
-      {format === 'webm' && transparent && alphaOk === false && <p className="hint warn">This browser can’t encode WebM with alpha. Use Chrome or Edge, or export a PNG sequence.</p>}
-      {format === 'webm' && transparent && alphaOk && <p className="hint">VP9 with alpha plays with transparency in Chrome, Edge, Firefox, After Effects (with plugin), Premiere and DaVinci Resolve.</p>}
-      {videoUnsupported && <p className="hint warn">Your browser doesn’t support WebCodecs video encoding. Use a recent Chrome, Edge or Safari, or export a PNG sequence.</p>}
+      {isGif && <p className="hint">{t('GIFs are limited to 256 colors per frame and get large quickly — 720 px at 15–20 fps is a good balance for chats and the web.')}{transparent ? ' ' + t('Transparent GIFs have hard (non-smoothed) edges; use WebM or PNG for soft transparency.') : ''}</p>}
+      {format === 'mp4' && project.canvas.transparent && <p className="hint warn">{t('MP4 (H.264) can’t store transparency — the canvas background color will be used. Choose WebM or PNG for alpha.')}</p>}
+      {format === 'webm' && transparent && alphaOk === false && <p className="hint warn">{t('This browser can’t encode WebM with alpha. Use Chrome or Edge, or export a PNG sequence.')}</p>}
+      {format === 'webm' && transparent && alphaOk && <p className="hint">{t('VP9 with alpha plays with transparency in Chrome, Edge, Firefox, After Effects (with plugin), Premiere and DaVinci Resolve.')}</p>}
+      {videoUnsupported && <p className="hint warn">{t('Your browser doesn’t support WebCodecs video encoding. Use a recent Chrome, Edge or Safari, or export a PNG sequence.')}</p>}
 
       <div className="export-summary">
-        <div><span>Output</span><b>{size.width} × {size.height}</b></div>
-        <div><span>Duration</span><b>{project.canvas.duration.toFixed(2)}s</b></div>
-        <div><span>Frames</span><b>{frames}</b></div>
-        <div><span>Alpha</span><b>{format !== 'mp4' && transparent ? 'Yes' : 'No'}</b></div>
+        <div><span>{t('Output')}</span><b>{size.width} × {size.height}</b></div>
+        <div><span>{t('Duration')}</span><b>{project.canvas.duration.toFixed(2)}s</b></div>
+        <div><span>{t('Frames')}</span><b>{frames}</b></div>
+        <div><span>{t('Alpha')}</span><b>{format !== 'mp4' && transparent ? t('Yes') : t('No')}</b></div>
       </div>
 
       {progress && (
         <div className="progress">
           <div className="progress-head">
-            <span>{error ? 'Export failed' : result ? 'Done' : progress.phase}</span>
+            <span>{error ? t('Export failed') : result ? t('Done') : t(progress.phase.replace(/^Encoding (AVC|HEVC|VP9|VP8|AV1)$/, 'Encoding {codec}'), { codec: progress.phase.split(' ')[1] ?? '' })}</span>
             <span className="mono">{result ? `${(result.ms / 1000).toFixed(1)}s` : `${progress.frame}/${progress.total} · ${pct}%`}</span>
           </div>
           <div className="bar"><div style={{ width: `${result ? 100 : pct}%` }} className={error ? 'err' : result ? 'ok' : ''} /></div>
         </div>
       )}
-      {error && <p className="hint warn">{error}</p>}
+      {error && <p className="hint warn">{t(error)}</p>}
       {result && (
         <div className="export-done">
           <Icon name="sparkle" size={16} />
           <div>
-            <b>{result.savedToFolder ? `Saved frames to folder “${result.filename}”` : result.filename}</b>
+            <b>{result.savedToFolder ? t('Saved frames to folder “{name}”', { name: result.filename }) : result.filename}</b>
             <span className="muted small">{result.blob ? ` · ${(result.blob.size / 1048576).toFixed(1)} MB` : ''}{result.codec ? ` · ${result.codec.toUpperCase()}` : ''}</span>
           </div>
-          {result.blob && <Button variant="ghost" icon="download" onClick={() => download(result.blob!, result.filename)}>Download</Button>}
+          {result.blob && <Button variant="ghost" icon="download" onClick={() => download(result.blob!, result.filename)}>{t('Download')}</Button>}
         </div>
       )}
     </Modal>

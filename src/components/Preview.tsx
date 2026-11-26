@@ -4,6 +4,7 @@ import { renderProject } from '../render/renderer';
 import { ensureFonts } from '../lib/fonts';
 import { IconButton, Select } from './ui';
 import type { BaseElement } from '../types';
+import { useT } from '../i18n';
 
 type Handle = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -16,6 +17,7 @@ export function Preview() {
   const selectedId = useStore((s) => s.selectedId);
   const zoomSetting = useStore((s) => s.zoom);
   const showSafe = useStore((s) => s.showSafeArea);
+  const t = useT();
   const [avail, setAvail] = useState({ w: 800, h: 450 });
   const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
   const [hover, setHover] = useState<string | null>(null);
@@ -126,13 +128,13 @@ export function Preview() {
   };
 
   const zoomOptions = [
-    { value: 'fit', label: `Fit (${Math.round(fit * 100)}%)` },
+    { value: 'fit', label: t('Fit ({n}%)', { n: Math.round(fit * 100) }) },
     { value: '0.25', label: '25%' }, { value: '0.5', label: '50%' }, { value: '0.75', label: '75%' }, { value: '1', label: '100%' }, { value: '2', label: '200%' },
   ];
 
   return (
     <div className="preview" ref={wrapRef} onPointerDown={() => useStore.getState().select(null)}>
-      <div className="preview-scroll">
+      <div className="preview-scroll" dir="ltr">
         <div className={`stage ${transparent ? 'checker' : ''}`} style={{ width: dispW, height: dispH }}>
           <canvas ref={canvasRef} data-zoom={zoom} style={{ width: dispW, height: dispH }} />
           <div className="overlay">
@@ -160,8 +162,8 @@ export function Preview() {
         </div>
       </div>
       <div className="preview-hud" onPointerDown={(e) => e.stopPropagation()}>
-        <span className="hud-dim">{CW} × {CH}{transparent ? ' · Alpha' : ''} · {project.canvas.direction.toUpperCase()}</span>
-        <IconButton icon="safe" title="Toggle title-safe guides" active={showSafe} onClick={() => useStore.setState({ showSafeArea: !showSafe })} />
+        <span className="hud-dim">{CW} × {CH}{transparent ? ' · ' + t('Alpha') : ''} · {project.canvas.direction.toUpperCase()}</span>
+        <IconButton icon="safe" title={t('Toggle title-safe guides')} active={showSafe} onClick={() => useStore.setState({ showSafeArea: !showSafe })} />
         <Select value={zoomSetting === 'fit' ? 'fit' : String(zoomSetting)} onChange={(v) => useStore.getState().setZoom(v === 'fit' ? 'fit' : +v)} options={zoomOptions} />
       </div>
     </div>
