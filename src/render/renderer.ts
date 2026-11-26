@@ -53,6 +53,15 @@ function txt(
   if (maxW && maxW > 0) ctx.fillText(s, x, y, maxW); else ctx.fillText(s, x, y);
 }
 
+/** Largest font size ≤ `size` at which every string in `strs` fits within `maxW` (keeps text inside its box). */
+function fitSize(rc: RC, strs: string[], size: number, maxW: number, weight?: number) {
+  if (maxW <= 0) return size;
+  rc.ctx.font = font(rc, size, weight);
+  let w = 0;
+  for (const s of strs) w = Math.max(w, rc.ctx.measureText(s).width);
+  return w > maxW ? size * (maxW / w) : size;
+}
+
 /** Horizontal alignment that respects reading direction */
 function sideAlign(rc: RC, a: string): CanvasTextAlign {
   if (a === 'center') return 'center';
@@ -120,7 +129,8 @@ function drawRing(rc: RC) {
   }
 
   const label = str(P.label);
-  const fs = (r - sw / 2) * 0.62 * el.fontScale;
+  const finalShown = bool(P.showAsPercent, true) ? (value / max) * 100 : value;
+  const fs = fitSize(rc, [formatNumber(finalShown, el.format)], (r - sw / 2) * 0.62 * el.fontScale, (r - sw / 2) * 1.7);
   if (bool(P.showValue, true)) {
     const shown = bool(P.showAsPercent, true) ? (value / max) * 100 * p : value * p;
     txt(rc, formatNumber(shown, el.format), cx, label ? cy - fs * 0.12 : cy, fs, col(rc, el.textColor), 'center', 'middle');
@@ -138,7 +148,7 @@ function drawCounter(rc: RC) {
   const x = align === 'center' ? el.w / 2 : align === 'left' ? 0 : el.w;
   const label = str(P.label);
   const labelAbove = str(P.labelPosition, 'below') === 'above';
-  const fs = el.h * (label ? 0.62 : 0.8) * el.fontScale;
+  const fs = fitSize(rc, [formatNumber(from, el.format), formatNumber(to, el.format)], el.h * (label ? 0.62 : 0.8) * el.fontScale, el.w * 0.98);
   const lfs = fs * 0.28;
   const gap = fs * 0.12;
   const total = fs + (label ? lfs + gap : 0);
@@ -558,7 +568,7 @@ function drawKpi(rc: RC) {
   const sx = rc.rtl ? el.w - pad : pad;
   const tfs = m * 0.085 * el.fontScale;
   txt(rc, str(P.title, 'Revenue'), sx, pad + tfs / 2, tfs, col(rc, el.mutedColor), align, 'middle', 500, el.w - pad * 2);
-  const vfs = m * 0.24 * el.fontScale;
+  const vfs = fitSize(rc, [formatNumber(num(P.value, 0), el.format)], m * 0.24 * el.fontScale, el.w - pad * 2);
   const vy = pad + tfs + m * 0.06 + vfs / 2;
   const value = num(P.value, 0) * p;
   txt(rc, formatNumber(value, el.format), sx, vy, vfs, col(rc, el.textColor), align, 'middle', undefined, el.w - pad * 2);
@@ -601,7 +611,14 @@ function drawGrowth(rc: RC) {
   const style = str(P.style, 'pill');
   const label = str(P.label, '');
   const h = el.h;
-  const fs = h * (label && style !== 'pill' ? 0.42 : 0.46) * el.fontScale;
+  let fs = h * (label && style !== 'pill' ? 0.42 : 0.46) * el.fontScale;
+  {
+    // shrink so arrow + final number (+ pill padding) fit the box width
+    ctx.font = font(rc, fs);
+    const fw = ctx.measureText(formatNumber(v, el.format, { signed: bool(P.showSign, true) })).width;
+    const need = fw + (bool(P.showArrow, true) ? fs * 1.25 : 0) + (style === 'pill' ? fs * 1.2 : 0);
+    if (need > el.w * 0.98) fs *= (el.w * 0.98) / need;
+  }
   const s = formatNumber(v * p, el.format, { signed: bool(P.showSign, true) });
   ctx.font = font(rc, fs);
   const tw = ctx.measureText(s).width;
@@ -644,9 +661,11 @@ function drawText(rc: RC) {
   const P = el.props;
   const text = str(P.text, 'Title');
   const align = sideAlign(rc, str(P.align, 'start'));
-  const fs = num(P.size, 64) * el.fontScale;
-  const lh = fs * num(P.lineHeight, 1.2);
   const lines = text.split('\n');
+  ctx.letterSpacing = `${num(P.tracking, 0) * num(P.size, 64) * el.fontScale}px`;
+  const fs = fitSize(rc, lines, num(P.size, 64) * el.fontScale, el.w);
+  ctx.letterSpacing = '0px';
+  const lh = fs * num(P.lineHeight, 1.2);
   const x = align === 'center' ? el.w / 2 : align === 'left' ? 0 : el.w;
   const total = lines.length * lh;
   const y0 = (el.h - total) / 2 + lh / 2;

@@ -221,6 +221,8 @@ function ElementPanel({ el }: { el: BaseElement }) {
   );
 }
 
+type ScaleMode = 'stretch' | 'fit' | 'none';
+
 const SIZE_PRESETS = [
   { label: 'Full HD 16:9 · 1920×1080', w: 1920, h: 1080 },
   { label: '4K UHD 16:9 · 3840×2160', w: 3840, h: 2160 },
@@ -238,20 +240,27 @@ function CanvasPanel() {
   const st = useStore.getState;
   const up = (fn: (p: ReturnType<typeof st>['project']) => void, k: string) => st().update(fn, k);
   const preset = SIZE_PRESETS.find((p) => p.w === c.width && p.h === c.height);
-  const resize = (w: number, h: number, rescale: boolean) => up((p) => {
-    if (rescale) {
-      const sx = w / p.canvas.width, sy = h / p.canvas.height, s = Math.min(sx, sy);
-      const ox = (w - p.canvas.width * s) / 2, oy = (h - p.canvas.height * s) / 2;
+  const resize = (w: number, h: number, mode: ScaleMode) => up((p) => {
+    if (mode !== 'none' && p.canvas.width > 0 && p.canvas.height > 0) {
+      const sx = w / p.canvas.width, sy = h / p.canvas.height;
+      // stretch: every box follows the canvas on both axes (fills the new size);
+      // fit: one uniform factor, layout centered (keeps proportions)
+      const fx = mode === 'stretch' ? sx : Math.min(sx, sy);
+      const fy = mode === 'stretch' ? sy : Math.min(sx, sy);
+      const ox = mode === 'stretch' ? 0 : (w - p.canvas.width * fx) / 2;
+      const oy = mode === 'stretch' ? 0 : (h - p.canvas.height * fy) / 2;
+      const k = Math.min(fx, fy); // for strokes, corner radii and text size, so they still fit their boxes
       for (const e of p.elements) {
-        e.x = Math.round(e.x * s + ox); e.y = Math.round(e.y * s + oy); e.w = Math.round(e.w * s); e.h = Math.round(e.h * s);
-        e.strokeWidth *= s;
-        if (e.type === 'text') e.props.size = Math.round(Number(e.props.size) * s);
-        else if (e.type !== 'ring' && e.type !== 'pie') e.radius = Math.round(e.radius * s);
+        e.x = Math.round(e.x * fx + ox); e.y = Math.round(e.y * fy + oy);
+        e.w = Math.max(20, Math.round(e.w * fx)); e.h = Math.max(20, Math.round(e.h * fy));
+        e.strokeWidth = Math.max(0.5, e.strokeWidth * k);
+        if (e.type === 'text') e.props.size = Math.max(4, Math.round(Number(e.props.size) * k));
+        else if (e.type !== 'ring' && e.type !== 'pie') e.radius = Math.round(e.radius * k);
       }
     }
     p.canvas.width = w; p.canvas.height = h;
   }, 'size');
-  const [rescale, setRescale] = useState(true);
+  const [scaleMode, setScaleMode] = useState<ScaleMode>('stretch');
   return (
     <>
       <Section title={t('Project')}>
@@ -259,14 +268,21 @@ function CanvasPanel() {
       </Section>
       <Section title={t('Dimensions')}>
         <Row label={t('Preset')}>
-          <Select value={preset ? preset.label : 'custom'} onChange={(v) => { const p = SIZE_PRESETS.find((x) => x.label === v); if (p) resize(p.w, p.h, rescale); }}
+          <Select value={preset ? preset.label : 'custom'} onChange={(v) => { const p = SIZE_PRESETS.find((x) => x.label === v); if (p) resize(p.w, p.h, scaleMode); }}
             options={[...SIZE_PRESETS.map((p) => ({ value: p.label, label: t(p.label.split(' · ')[0]) + ' · ' + p.label.split(' · ')[1] })), ...(preset ? [] : [{ value: 'custom', label: `${t('Custom')} · ${c.width}×${c.height}` }])]} />
         </Row>
         <Grid2>
-          <NumberField label="W" value={c.width} min={16} max={8192} suffix="px" commitOnBlur onChange={(v) => resize(Math.round(v), c.height, rescale)} />
-          <NumberField label="H" value={c.height} min={16} max={8192} suffix="px" commitOnBlur onChange={(v) => resize(c.width, Math.round(v), rescale)} />
+          <NumberField label="W" value={c.width} min={16} max={8192} suffix="px" commitOnBlur onChange={(v) => resize(Math.round(v), c.height, scaleMode)} />
+          <NumberField label="H" value={c.height} min={16} max={8192} suffix="px" commitOnBlur onChange={(v) => resize(c.width, Math.round(v), scaleMode)} />
         </Grid2>
-        <Row label={t('Scale elements with canvas')}><Toggle value={rescale} onChange={setRescale} /></Row>
+        <Row label={t('When resizing')} wide>
+          <Segmented value={scaleMode} onChange={setScaleMode} options={[
+            { value: 'stretch', label: t('Fill canvas') },
+            { value: 'fit', label: t('Keep proportions') },
+            { value: 'none', label: t('Don’t scale') },
+          ]} />
+        </Row>
+        <p className="hint">{scaleMode === 'stretch' ? t('Charts stretch to fill the new width and height.') : scaleMode === 'fit' ? t('The whole layout scales evenly and stays centered.') : t('Elements keep their current size and position.')}</p>
       </Section>
       <Section title={t('Background')}>
         <Row label={t('Transparent')}><Toggle value={c.transparent} onChange={(v) => up((p) => { p.canvas.transparent = v; }, 'tr')} /></Row>
