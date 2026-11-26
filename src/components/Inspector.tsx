@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { selectedElement, useStore, type Panel } from '../store';
-import type { BaseElement, EasingName, Entrance } from '../types';
+import type { BaseElement, EasingName, Entrance, Project } from '../types';
 import { ARABIC_FONTS, BUILTIN_PALETTES, LATIN_FONTS } from '../defaults';
 import { EASING_LABELS, getEasing } from '../lib/easing';
 import { removeFont, uploadFont, useCustomFonts } from '../lib/fonts';
@@ -8,6 +8,8 @@ import { FIELDS, STAGGERED } from './fields';
 import { FieldControl } from './FieldControl';
 import { DataEditor, DataSheet } from './DataEditor';
 import { useT } from '../i18n';
+import { autoLayout } from '../lib/autolayout';
+import { applyResize, type ScaleMode } from '../lib/resize';
 import { Button, ColorField, Grid2, Icon, IconButton, NumberField, Row, Section, Segmented, Select, Slider, TextField, Toggle } from './ui';
 
 const TABS: { id: Panel; label: string }[] = [
@@ -221,7 +223,8 @@ function ElementPanel({ el }: { el: BaseElement }) {
   );
 }
 
-type ScaleMode = 'stretch' | 'fit' | 'none';
+/** Layout before the current run of canvas resizes (see applyResize) */
+let resizeRun: { base: Project; after: Project | null } | null = null;
 
 const SIZE_PRESETS = [
   { label: 'Full HD 16:9 · 1920×1080', w: 1920, h: 1080 },
@@ -240,26 +243,14 @@ function CanvasPanel() {
   const st = useStore.getState;
   const up = (fn: (p: ReturnType<typeof st>['project']) => void, k: string) => st().update(fn, k);
   const preset = SIZE_PRESETS.find((p) => p.w === c.width && p.h === c.height);
-  const resize = (w: number, h: number, mode: ScaleMode) => up((p) => {
-    if (mode !== 'none' && p.canvas.width > 0 && p.canvas.height > 0) {
-      const sx = w / p.canvas.width, sy = h / p.canvas.height;
-      // stretch: every box follows the canvas on both axes (fills the new size);
-      // fit: one uniform factor, layout centered (keeps proportions)
-      const fx = mode === 'stretch' ? sx : Math.min(sx, sy);
-      const fy = mode === 'stretch' ? sy : Math.min(sx, sy);
-      const ox = mode === 'stretch' ? 0 : (w - p.canvas.width * fx) / 2;
-      const oy = mode === 'stretch' ? 0 : (h - p.canvas.height * fy) / 2;
-      const k = Math.min(fx, fy); // for strokes, corner radii and text size, so they still fit their boxes
-      for (const e of p.elements) {
-        e.x = Math.round(e.x * fx + ox); e.y = Math.round(e.y * fy + oy);
-        e.w = Math.max(20, Math.round(e.w * fx)); e.h = Math.max(20, Math.round(e.h * fy));
-        e.strokeWidth = Math.max(0.5, e.strokeWidth * k);
-        if (e.type === 'text') e.props.size = Math.max(4, Math.round(Number(e.props.size) * k));
-        else if (e.type !== 'ring' && e.type !== 'pie') e.radius = Math.round(e.radius * k);
-      }
-    }
-    p.canvas.width = w; p.canvas.height = h;
-  }, 'size');
+  const resize = (w: number, h: number, mode: ScaleMode) => {
+    const cur = st().project;
+    // start a new resize run whenever the project was edited by anything other than our last resize
+    if (!resizeRun || resizeRun.after !== cur) resizeRun = { base: structuredClone(cur), after: null };
+    const base = resizeRun.base;
+    up((p) => applyResize(p, base, w, h, mode), 'size');
+    resizeRun.after = st().project;
+  };
   const [scaleMode, setScaleMode] = useState<ScaleMode>('stretch');
   return (
     <>
@@ -283,6 +274,8 @@ function CanvasPanel() {
           ]} />
         </Row>
         <p className="hint">{scaleMode === 'stretch' ? t('Charts stretch to fill the new width and height.') : scaleMode === 'fit' ? t('The whole layout scales evenly and stays centered.') : t('Elements keep their current size and position.')}</p>
+        <Button icon="grid" onClick={() => { st().update((p) => autoLayout(p)); st().notify(t('Elements arranged for {w}×{h}', { w: c.width, h: c.height })); }}>{t('Auto-arrange for this size')}</Button>
+        <p className="hint">{t('Re-flows charts into rows that suit this canvas — e.g. stacks them for vertical stories. Undo with ⌘Z.')}</p>
       </Section>
       <Section title={t('Background')}>
         <Row label={t('Transparent')}><Toggle value={c.transparent} onChange={(v) => up((p) => { p.canvas.transparent = v; }, 'tr')} /></Row>
