@@ -263,10 +263,10 @@ function CanvasPanel() {
             options={[...SIZE_PRESETS.map((p) => ({ value: p.label, label: t(p.label.split(' · ')[0]) + ' · ' + p.label.split(' · ')[1] })), ...(preset ? [] : [{ value: 'custom', label: `${t('Custom')} · ${c.width}×${c.height}` }])]} />
         </Row>
         <Grid2>
-          <NumberField label="W" value={c.width} min={16} max={8192} suffix="px" onChange={(v) => resize(Math.round(v), c.height, false)} />
-          <NumberField label="H" value={c.height} min={16} max={8192} suffix="px" onChange={(v) => resize(c.width, Math.round(v), false)} />
+          <NumberField label="W" value={c.width} min={16} max={8192} suffix="px" commitOnBlur onChange={(v) => resize(Math.round(v), c.height, rescale)} />
+          <NumberField label="H" value={c.height} min={16} max={8192} suffix="px" commitOnBlur onChange={(v) => resize(c.width, Math.round(v), rescale)} />
         </Grid2>
-        <Row label={t('Scale layout with preset')}><Toggle value={rescale} onChange={setRescale} /></Row>
+        <Row label={t('Scale elements with canvas')}><Toggle value={rescale} onChange={setRescale} /></Row>
       </Section>
       <Section title={t('Background')}>
         <Row label={t('Transparent')}><Toggle value={c.transparent} onChange={(v) => up((p) => { p.canvas.transparent = v; }, 'tr')} /></Row>

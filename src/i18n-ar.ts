@@ -274,7 +274,7 @@ export const AR: Record<string, string> = {
   'Portrait 4:5': 'طولي 4:5',
   'HD 16:9': 'HD أفقي 16:9',
   'Ultrawide 21:9': 'عريض 21:9',
-  'Scale layout with preset': 'تحجيم العناصر مع المقاس',
+  'Scale elements with canvas': 'تحجيم العناصر مع اللوحة',
   'Background': 'الخلفية',
   'Transparent': 'شفافة',
   'Color': 'اللون',

@@ -95,8 +95,9 @@ export function Grid2({ children }: { children: ReactNode }) {
 
 // ───────────────── Inputs ─────────────────
 /** Number input with a scrubbable label (drag horizontally like pro motion apps) */
-export function NumberField({ label, value, onChange, step = 1, min, max, suffix, precision }: {
-  label?: string; value: number; onChange: (v: number) => void; step?: number; min?: number; max?: number; suffix?: string; precision?: number;
+/** `commitOnBlur`: apply typed/dragged values only when finished (Enter, blur, pointer up) instead of on every keystroke. */
+export function NumberField({ label, value, onChange, step = 1, min, max, suffix, precision, commitOnBlur }: {
+  label?: string; value: number; onChange: (v: number) => void; step?: number; min?: number; max?: number; suffix?: string; precision?: number; commitOnBlur?: boolean;
 }) {
   const t = useT();
   const [draft, setDraft] = useState<string | null>(null);
@@ -108,12 +109,16 @@ export function NumberField({ label, value, onChange, step = 1, min, max, suffix
     const x0 = e.clientX, v0 = value;
     const el = e.currentTarget as HTMLElement;
     el.setPointerCapture(e.pointerId);
+    let last = v0;
     const move = (ev: PointerEvent) => {
       const k = ev.shiftKey ? 10 : ev.altKey ? 0.1 : 1;
-      const v = clampV(v0 + Math.round((ev.clientX - x0) / 2) * step * k);
-      onChange(+v.toFixed(prec + 1));
+      last = +clampV(v0 + Math.round((ev.clientX - x0) / 2) * step * k).toFixed(prec + 1);
+      if (commitOnBlur) setDraft(String(last)); else onChange(last);
     };
-    const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); };
+    const up = () => {
+      el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up);
+      if (commitOnBlur) { setDraft(null); if (last !== v0) onChange(last); }
+    };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
   };
@@ -125,12 +130,20 @@ export function NumberField({ label, value, onChange, step = 1, min, max, suffix
         onFocus={(e) => { setDraft(display); e.target.select(); }}
         onChange={(e) => {
           setDraft(e.target.value);
+          if (commitOnBlur) return;
           const v = parseFloat(e.target.value);
           if (Number.isFinite(v)) onChange(clampV(v));
         }}
-        onBlur={() => setDraft(null)}
+        onBlur={() => {
+          if (commitOnBlur && draft !== null) {
+            const v = parseFloat(draft);
+            if (Number.isFinite(v) && clampV(v) !== value) onChange(clampV(v));
+          }
+          setDraft(null);
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') { setDraft(String(value)); requestAnimationFrame(() => (e.target as HTMLInputElement).blur()); }
           if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
             e.preventDefault();
             const k = (e.shiftKey ? 10 : 1) * (e.key === 'ArrowUp' ? 1 : -1);
